@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository is a research and engineering project to **convert Llama models into Mixture-of-Experts (MoE) models** based on [Taishi-N324/Drop-Upcycling][1], leveraging the architecture and components of Hugging Face's `transformers` library, especially `modeling_llama` and `modeling_mistral`.  
+This repository is a research and engineering project to **convert Llama models into Mixture-of-Experts (MoE) models** based on [Taishi-N324/Drop-Upcycling][1], leveraging the architecture and components of Hugging Face's `transformers` library, especially `modeling_llama` and `modeling_mixtral`.  
 The goal is to enable Llama-based models to benefit from sparse MoE architectures, advanced routing strategies, and partial upcycling/re-initialization techniques.
 
 ## Motivation
