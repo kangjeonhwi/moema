@@ -26,7 +26,7 @@ import torch.nn.functional as F
 import re
 from tqdm import tqdm
 
-from .noise_upcycling import initialize_gate_weights, shuffle_and_partially_initialize
+from ..upcycling_strategies.noise_upcycling import initialize_gate_weights, shuffle_and_partially_initialize
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache, DynamicCache, SlidingWindowCache, StaticCache
 from transformers.generation import GenerationMixin
@@ -996,94 +996,6 @@ class MoemaForCausalLM(MoemaPreTrainedModel, GenerationMixin):
 
     def get_decoder(self):
         return self.model
-
-    @classmethod
-    def from_llama(cls, 
-                model_path: str = "meta-llama/Llama-3.2-1B",
-                upcycling_method: str = "noise",
-                num_experts: int = 6,
-                num_experts_per_tok: int = 2,
-                output_router_logits: bool = False,
-                router_aux_loss_coef: float = 0.01,
-                router_jiter_noise: float = 0.1,
-                sliding_window = None,
-                torch_dtype: torch.dtype = torch.bfloat16,
-                ffn_init_ratio: float = 0
-                ):
-
-        llama_model = AutoModelForCausalLM.from_pretrained(
-            model_path, torch_dtype=torch_dtype
-        )
-        llama_config = llama_model.config
-
-        target_config = MoemaConfig.from_llama_config(
-            llama_config,
-            num_experts=num_experts,
-            num_experts_per_tok=num_experts_per_tok,
-            output_router_logits=output_router_logits,
-            router_aux_loss_coef=router_aux_loss_coef,
-            router_jiter_noise=router_jiter_noise,
-            sliding_window=sliding_window,
-        )
-
-        target_model = cls(target_config).to(dtype=torch_dtype)
-        target_intermediate_size = target_config.intermediate_size
-
-        exclude_pattern = r"model\.layers\.\d+\.mlp\.(gate_proj|up_proj|down_proj)\.weight"
-        exclude_layers = {
-            name for name in target_model.state_dict().keys()
-            if re.match(exclude_pattern, name)
-        }
-
-        base_src = "model.layers.{}.block_sparse_moe.experts.{}"
-        base_tgt = "model.layers.{}.mlp"
-        replace_mapping = {
-            f"{base_src}.w1.weight": f"{base_tgt}.gate_proj.weight",
-            f"{base_src}.w2.weight": f"{base_tgt}.down_proj.weight",
-            f"{base_src}.w3.weight": f"{base_tgt}.up_proj.weight",
-        }
-
-        source_state_dict = llama_model.state_dict()
-        target_state_dict = target_model.state_dict()
-
-        # 먼저 공통 레이어 복사 (FFN 제외)
-        for name in tqdm(target_state_dict.keys(), desc="Copying non-FFN layers"):
-            if name not in exclude_layers and name in source_state_dict:
-                target_state_dict[name] = source_state_dict[name]
-
-        # 게이트 weight 초기화
-        for layer_idx in tqdm(range(target_config.num_hidden_layers), desc="Init gate weights"):
-            gate_weight_name = f"model.layers.{layer_idx}.block_sparse_moe.gate.weight"
-            if gate_weight_name in target_state_dict:
-                target_state_dict[gate_weight_name] = initialize_gate_weights(
-                    target_state_dict[gate_weight_name].shape, "torch_rand"
-                )
-
-        # 각 FFN 레이어를 각 expert에 복사 (optionally permute/initialize)
-        for layer_idx in tqdm(range(target_config.num_hidden_layers), desc="Copying FFN to experts"):
-            for expert_idx in range(num_experts):
-                perm = torch.randperm(target_intermediate_size)
-                for target_pattern, source_pattern in replace_mapping.items():
-                    target_name = target_pattern.format(layer_idx, expert_idx)
-                    source_name = source_pattern.format(layer_idx)
-                    if target_name in target_state_dict and source_name in source_state_dict:
-                        source_tensor = source_state_dict[source_name]
-                        is_down_proj = "down_proj" in source_name
-                        shuffled_tensor = shuffle_and_partially_initialize(
-                            source_tensor,
-                            perm,
-                            target_intermediate_size,
-                            is_down_proj,
-                            layer_idx,
-                            expert_idx,
-                            ffn_init_ratio,
-                        )
-                        target_state_dict[target_name] = shuffled_tensor
-
-        target_model.load_state_dict(target_state_dict)
-        return target_model
-
-
 
     @add_start_docstrings_to_model_forward(MOEMA_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=CausalLMOutputWithPast, config_class=_CONFIG_FOR_DOC)
