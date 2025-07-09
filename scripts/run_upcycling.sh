@@ -1,11 +1,11 @@
 # 실험하고 싶은 전문가(expert)의 수를 공백으로 구분하여 나열합니다.
 EXPERTS_LIST="2"
-SOURCE_MODEL="meta-llama/Llama-3.2-1B"
+SOURCE_MODEL="meta-llama/Llama-3.2-3B-Instruct"
 
 
 UPCYCLING_METHOD="naive"
-NUM_EXPERTS_PER_TOK=1
-FFN_INIT_RATIO=0.25
+NUM_EXPERTS_PER_TOK=2
+FFN_INIT_RATIO=0
 SEED=42
 BASE_OUTPUT_PATH="/home/MoE/moema2/moema/output/upcycled_models"
 
