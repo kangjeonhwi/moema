@@ -1,0 +1,25 @@
+# evaluation_config.yaml
+datasets:
+  - name: english_QA
+    path: "/home/MoE/moema2/moema/dataset/processed_dataset/en/eval.jsonl"
+    split: "validation"
+    system_key: "system"
+    question_key: "instruction"
+    context_key: "input"
+    answers_key: "output"
+
+  - name: kor_QA
+    path: "/home/MoE/moema2/moema/dataset/processed_dataset/ko/eval.jsonl"
+    split: "validation"
+    system_key: "system"
+    question_key: "instruction"
+    context_key: "input"
+    answers_key: "output"
+
+  - name: legal_QA
+    path: "/home/MoE/moema2/moema/dataset/processed_dataset/legal/eval.jsonl"
+    split: "validation"
+    system_key: "system"
+    question_key: "instruction"
+    context_key: "input"
+    answers_key: "output"
